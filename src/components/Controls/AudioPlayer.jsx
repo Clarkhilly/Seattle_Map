@@ -63,7 +63,7 @@ const AudioPlayer = ({ isDarkMode }) => {
 
   return (
     <div style={musicPlayerContainerStyle}>
-      <div style={musicLabelStyle}>InRaindows </div>
+      <div style={musicLabelStyle}>InRainbows</div>
       <div style={audioPlayerStyle}>
         <audio 
           ref={audioRef} 
