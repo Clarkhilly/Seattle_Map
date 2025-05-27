@@ -8,8 +8,6 @@ A web app for live route visualizations of the Seattle Link, powered by Mapbox.
 # Future Improvements
 + Real-time train tracking
 + Bring Site Live
-+ Music
 + MonoRail
 + Street Cars
-  
-
++ Music variety
