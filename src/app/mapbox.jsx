@@ -8,7 +8,6 @@ const defaultBounds = [
   [-121.8, 47.9]     // Northeast (includes Redmond, Bothell)
 ];
 
-// Updated station coordinates with your exact data
 const seattleStations = {
   // 1 Line Stations (North to South) - Updated with precise coordinates from OSM data
   "lynnwood": { name: "Lynnwood City Center", coords: [ -122.2947,  47.8156], line: "1" },
@@ -35,17 +34,20 @@ const seattleStations = {
   "seatac": { name: "SeaTac/Airport", coords: [-122.2968266, 47.4453482], line: "1" },
   "angle-lake": { name: "Angle Lake", coords: [-122.2978768, 47.4224108], line: "1" },
   
-  // 2 Line Stations (East Link) - Keep your existing ones for now
+  // 2 Line Stations (East Link) 
 
-  "bellevue-downtown": { name: "Bellevue Downtown", coords: [-122.1969, 47.6105], line: "2" },
-  "east-main": { name: "East Main", coords: [-122.1812, 47.5996], line: "2" },
-  "south-bellevue": { name: "South Bellevue", coords: [-122.1643, 47.5784], line: "2" },
-  "bel-red": { name: "BelRed / 130th", coords: [-122.1332, 47.6322], line: "2" },
-  "spring-district": { name: "Spring District", coords: [-122.1601, 47.6384], line: "2" },
-  "overlake-village": { name: "Overlake Village", coords: [-122.1328, 47.6439], line: "2" },
-  "redmond-tech": { name: "Redmond Technology", coords: [-122.1221, 47.6385], line: "2" },
-  "downtown-redmond": { name: "Downtown Redmond", coords: [-122.1080, 47.6740], line: "2" }
+  "bellevue-downtown": { name: "Bellevue Downtown", coords: [-122.1920, 47.6152], line: "2" },
+  "east-main": { name: "East Main", coords: [-122.1911, 47.6081], line: "2" },
+  "south-bellevue": { name: "South Bellevue", coords: [-122.1906, 47.5868], line: "2" }, 
+  "wilburton": { name: "Wilburton", coords: [ -122.1837, 47.6179], line: "2" }, 
+  "spring-district": { name: "Spring District", coords: [-122.1785, 47.6237], line: "2" }, 
+  "bel-red": { name: "Bel-Red", coords: [-122.1656, 47.6244], line: "2" }, 
+  "overlake-village": { name: "Overlake Village", coords: [-122.1389, 47.6363], line: "2" }, 
+  "redmond-tech": { name: "Redmond technology", coords: [-122.1336, 47.6448], line: "2" }, 
+  "marymoor village": { name: "Marymoor Village", coords: [-122.1097, 47.667], line: "2" }, 
+  "downtown-redmond": { name: "Downtown Redmond", coords: [-122.1184, 47.671], line: "2" }
 };
+
 
 mapboxgl.accessToken = process.env.MAPBOX_TOKEN;
 
