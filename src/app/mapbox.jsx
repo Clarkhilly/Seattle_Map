@@ -10,34 +10,33 @@ const defaultBounds = [
 
 // Updated station coordinates with your exact data
 const seattleStations = {
-  // 1 Line Stations (North to South) - Updated with precise coordinates
-  "lynnwood": { name: "Lynnwood City Center", coords: [-122.2858, 47.8188], line: "1" },
-  "mountlake": { name: "Mountlake Terrace", coords: [-122.2782, 47.7836], line: "1" },
+  // 1 Line Stations (North to South) - Updated with precise coordinates from OSM data
+  "lynnwood": { name: "Lynnwood City Center", coords: [ -122.2947,  47.8156], line: "1" },
+  "mountlake": { name: "Mountlake Terrace", coords: [-122.3148749, 47.7846309], line: "1" },
   "shoreline-n": { name: "Shoreline North/185th", coords: [-122.3175, 47.7770], line: "1" },
-  "shoreline-s": { name: "Shoreline South/148th", coords: [-122.3276, 47.7479], line: "1" },
-  "northgate": { name: "Northgate", coords: [-122.3374, 47.7522], line: "1" },
-  "roosevelt": { name: "Roosevelt", coords: [-122.3184, 47.6587], line: "1" },
-  "u-district": { name: "U District", coords: [-122.3138, 47.6601], line: "1" },
-  "university": { name: "University of Washington", coords: [-122.3037, 47.6587], line: "1" },
-  "capitol-hill": { name: "Capitol Hill", coords: [-122.3187, 47.6187], line: "1" },
-  "westlake": { name: "Westlake", coords: [-122.3302, 47.6087], line: "both" },
+  "shoreline-s": { name: "Shoreline South/148th", coords: [-122.3251802, 47.7361086], line: "1" },
+  "northgate": { name: "Northgate", coords: [-122.3283090, 47.7030260], line: "1" },
+  "roosevelt": { name: "Roosevelt", coords: [-122.3160, 47.6761], line: "1" }, 
+  "u-district": { name: "U District", coords: [-122.3140450, 47.6604924], line: "1" },
+  "university": { name: "University of Washington", coords: [-122.3036900, 47.6498555], line: "1" },
+  "capitol-hill": { name: "Capitol Hill", coords: [-122.3201293, 47.6190767], line: "both" },
+  "westlake": { name: "Westlake", coords: [-122.3368828, 47.6115534], line: "both" },
   "symphony": { name: "Symphony (University Street)", coords: [-122.3326, 47.6062], line: "both" },
-  "pioneer-square": { name: "Pioneer Square", coords: [-122.3340, 47.6021], line: "both" },
+  "pioneer-square": { name: "Pioneer Square", coords: [-122.3317016, 47.6031492], line: "both" },
   "intl-district": { name: "Intl. District/Chinatown", coords: [-122.3289, 47.5952], line: "both" },
-  "stadium": { name: "Stadium", coords: [-122.3138, 47.5911], line: "1" },
-  "sodo": { name: "SODO", coords: [-122.3063, 47.5781], line: "1" },
-  "beacon-hill": { name: "Beacon Hill", coords: [-122.3063, 47.5609], line: "1" },
-  "mount-baker": { name: "Mount Baker", coords: [-122.2965, 47.5583], line: "1" },
-  "columbia-city": { name: "Columbia City", coords: [-122.2878, 47.5401], line: "1" },
-  "othello": { name: "Othello", coords: [-122.2801, 47.5255], line: "1" },
-  "rainier-beach": { name: "Rainier Beach", coords: [-122.2687, 47.5097], line: "1" },
-  "tukwila": { name: "Tukwila International Blvd", coords: [-122.2573, 47.4799], line: "1" },
-  "seatac": { name: "SeaTac/Airport", coords: [-122.3013, 47.4452], line: "1" },
-  "angle-lake": { name: "Angle Lake", coords: [-122.2934, 47.4124], line: "1" },
+  "stadium": { name: "Stadium", coords: [-122.3272659, 47.5911093], line: "1" },
+  "sodo": { name: "SODO", coords: [-122.3273765, 47.5812606], line: "1" },
+  "beacon-hill": { name: "Beacon Hill", coords: [-122.3116391, 47.5790849], line: "1" },
+  "mount-baker": { name: "Mount Baker", coords: [-122.2977276, 47.5765538], line: "1" },
+  "columbia-city": { name: "Columbia City", coords: [-122.2927376, 47.5597267], line: "1" },
+  "othello": { name: "Othello", coords: [-122.2815569, 47.5380005], line: "1" },
+  "rainier-beach": { name: "Rainier Beach", coords: [-122.2794530, 47.5224409], line: "1" },
+  "tukwila": { name: "Tukwila International Blvd", coords: [-122.2881, 47.4640], line: "1" },
+  "seatac": { name: "SeaTac/Airport", coords: [-122.2968266, 47.4453482], line: "1" },
+  "angle-lake": { name: "Angle Lake", coords: [-122.2978768, 47.4224108], line: "1" },
   
   // 2 Line Stations (East Link) - Keep your existing ones for now
-  "judkins-park": { name: "Judkins Park", coords: [-122.2907, 47.6006], line: "2" },
-  "mercer-island": { name: "Mercer Island", coords: [-122.2319, 47.5779], line: "2" },
+
   "bellevue-downtown": { name: "Bellevue Downtown", coords: [-122.1969, 47.6105], line: "2" },
   "east-main": { name: "East Main", coords: [-122.1812, 47.5996], line: "2" },
   "south-bellevue": { name: "South Bellevue", coords: [-122.1643, 47.5784], line: "2" },
@@ -183,7 +182,29 @@ class Mapbox extends React.Component {
 
     console.log('✅ Added station circles and labels with updated coordinates');
   }
-
+  async fetchSoundTransitStations() {
+  try {
+    // Sound Transit GTFS feed
+    const gtfsUrl = 'https://www.soundtransit.org/GTFS/google_transit.zip';
+    
+    // Alternative: Use their real-time API
+    const apiUrl = 'https://api.soundtransit.org/v1/gtfs/stops';
+    
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+    
+    // Filter for Link Light Rail stations
+    const linkStations = data.filter(stop => 
+      stop.route_type === 0 && // Light rail
+      stop.agency_id === 'ST'
+    );
+    
+    return linkStations;
+  } catch (error) {
+    console.log('Sound Transit API failed:', error);
+    return null;
+  }
+}
   async addOpenStreetMapRoute() {
     console.log('Loading detailed routes from OpenStreetMap...');
     
