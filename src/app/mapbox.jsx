@@ -35,7 +35,6 @@ const seattleStations = {
   "angle-lake": { name: "Angle Lake", coords: [-122.2978768, 47.4224108], line: "1" },
   
   // 2 Line Stations (East Link) 
-
   "bellevue-downtown": { name: "Bellevue Downtown", coords: [-122.1920, 47.6152], line: "2" },
   "east-main": { name: "East Main", coords: [-122.1911, 47.6081], line: "2" },
   "south-bellevue": { name: "South Bellevue", coords: [-122.1906, 47.5868], line: "2" }, 
@@ -48,7 +47,6 @@ const seattleStations = {
   "downtown-redmond": { name: "Downtown Redmond", coords: [-122.1184, 47.671], line: "2" }
 };
 
-
 mapboxgl.accessToken = process.env.MAPBOX_TOKEN;
 
 class Mapbox extends React.Component {
@@ -58,15 +56,20 @@ class Mapbox extends React.Component {
     this.state = {
       loading: true,
       timestamp: null,
+      isDarkMode: false,
     };
 
     this.mapLoaded = false;
   }
   
   componentDidMount() {
+    // Load saved dark mode preference
+    const savedDarkMode = localStorage.getItem('seattleTransitDarkMode') === 'true';
+    this.setState({ isDarkMode: savedDarkMode });
+
     this.map = new mapboxgl.Map({
       container: this.mapContainer,
-      style: 'mapbox://styles/mapbox/light-v10',
+      style: savedDarkMode ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/light-v10',
       center: center,
       zoom: 11,
       bearing: 0,
@@ -80,6 +83,27 @@ class Mapbox extends React.Component {
       this.setState({loading: false});
     });
   }
+
+  // Add toggle function
+  toggleDarkMode = () => {
+    const newDarkMode = !this.state.isDarkMode;
+    this.setState({ isDarkMode: newDarkMode });
+    
+    // Save preference
+    localStorage.setItem('seattleTransitDarkMode', newDarkMode.toString());
+    
+    // Change map style
+    const newStyle = newDarkMode ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/light-v10';
+    this.map.setStyle(newStyle);
+    
+    // Re-add layers after style change
+    this.map.once('styledata', () => {
+      if (this.mapLoaded) {
+        this.addOpenStreetMapRoute();
+        this.addStations();
+      }
+    });
+  };
 
   addStations() {
     console.log('Adding station squares...');
@@ -122,21 +146,27 @@ class Mapbox extends React.Component {
       "data": stationGeoJson
     });
 
-    // Add black circles as station squares
+    // Adjust colors based on dark mode
+    const stationColor = this.state.isDarkMode ? "#ffffff" : "#000000";
+    const stationStroke = this.state.isDarkMode ? "#000000" : "#ffffff";
+    const textColor = this.state.isDarkMode ? "#ffffff" : "#000000";
+    const textHalo = this.state.isDarkMode ? "#000000" : "#ffffff";
+
+    // Add station circles with theme-aware colors
     this.map.addLayer({
       "id": "StationSquares",
       "type": "circle",
       "source": "Stations",
       "paint": {
         "circle-radius": 8,
-        "circle-color": "#000000",
+        "circle-color": stationColor,
         "circle-stroke-width": 2,
-        "circle-stroke-color": "#ffffff",
+        "circle-stroke-color": stationStroke,
         "circle-opacity": 1
       }
     });
 
-    // Add station labels as a separate layer
+    // Add station labels with theme-aware colors
     this.map.addLayer({
       "id": "StationLabels",
       "type": "symbol",
@@ -150,8 +180,8 @@ class Mapbox extends React.Component {
         "text-allow-overlap": false
       },
       "paint": {
-        "text-color": "#000000",
-        "text-halo-color": "#ffffff",
+        "text-color": textColor,
+        "text-halo-color": textHalo,
         "text-halo-width": 2
       }
     });
@@ -184,29 +214,31 @@ class Mapbox extends React.Component {
 
     console.log('✅ Added station circles and labels with updated coordinates');
   }
+
   async fetchSoundTransitStations() {
-  try {
-    // Sound Transit GTFS feed
-    const gtfsUrl = 'https://www.soundtransit.org/GTFS/google_transit.zip';
-    
-    // Alternative: Use their real-time API
-    const apiUrl = 'https://api.soundtransit.org/v1/gtfs/stops';
-    
-    const response = await fetch(apiUrl);
-    const data = await response.json();
-    
-    // Filter for Link Light Rail stations
-    const linkStations = data.filter(stop => 
-      stop.route_type === 0 && // Light rail
-      stop.agency_id === 'ST'
-    );
-    
-    return linkStations;
-  } catch (error) {
-    console.log('Sound Transit API failed:', error);
-    return null;
+    try {
+      // Sound Transit GTFS feed
+      const gtfsUrl = 'https://www.soundtransit.org/GTFS/google_transit.zip';
+      
+      // Alternative: Use their real-time API
+      const apiUrl = 'https://api.soundtransit.org/v1/gtfs/stops';
+      
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+      
+      // Filter for Link Light Rail stations
+      const linkStations = data.filter(stop => 
+        stop.route_type === 0 && // Light rail
+        stop.agency_id === 'ST'
+      );
+      
+      return linkStations;
+    } catch (error) {
+      console.log('Sound Transit API failed:', error);
+      return null;
+    }
   }
-}
+
   async addOpenStreetMapRoute() {
     console.log('Loading detailed routes from OpenStreetMap...');
     
@@ -352,18 +384,6 @@ class Mapbox extends React.Component {
     }).filter(feature => feature.geometry.coordinates.length > 1); // Only include valid lines
   }
 
-  render() {
-    const { loading, timestamp } = this.state;
-    
-    return (
-      <div>
-        <div ref={el => this.mapContainer = el} className='mapbox' style={{width: '100%', height: '100vh'}}>
-        </div>
-        {loading && <div style={{position: 'absolute', top: '10px', left: '10px', background: 'white', padding: '10px'}}>Loading Seattle transit data...</div>}
-      </div>
-    );
-  }
-
   addStaticRouteLines() {
     console.log('Adding backup static route lines...');
     
@@ -425,6 +445,66 @@ class Mapbox extends React.Component {
     });
     
     console.log('✅ Added backup static route with precise coordinates');
+  }
+
+  render() {
+    const { loading, isDarkMode } = this.state;
+    
+    // Toggle button styles
+    const toggleButtonStyle = {
+      position: 'absolute',
+      top: '10px',
+      right: '10px',
+      zIndex: 1000,
+      backgroundColor: isDarkMode ? '#333' : '#fff',
+      color: isDarkMode ? '#fff' : '#333',
+      border: `2px solid ${isDarkMode ? '#555' : '#ddd'}`,
+      borderRadius: '8px',
+      padding: '10px 15px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+      transition: 'all 0.3s ease'
+    };
+
+    const loadingStyle = {
+      position: 'absolute',
+      top: '10px',
+      left: '10px',
+      background: isDarkMode ? '#333' : 'white',
+      color: isDarkMode ? '#fff' : '#333',
+      padding: '10px',
+      borderRadius: '5px',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+    };
+    
+    return (
+      <div style={{ backgroundColor: isDarkMode ? '#1a1a1a' : '#ffffff', height: '100vh' }}>
+        <div ref={el => this.mapContainer = el} className='mapbox' style={{width: '100%', height: '100vh'}}>
+        </div>
+        
+        {/* Dark Mode Toggle Button */}
+        <button 
+          onClick={this.toggleDarkMode}
+          style={toggleButtonStyle}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'scale(1)';
+          }}
+        >
+          {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
+        
+        {loading && (
+          <div style={loadingStyle}>
+            Loading Seattle transit data...
+          </div>
+        )}
+      </div>
+    );
   }
 }
 
