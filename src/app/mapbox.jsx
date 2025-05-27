@@ -69,7 +69,7 @@ class Mapbox extends React.Component {
       center: center,
       zoom: 11,
       bearing: 0,
-      // maxBounds: defaultBounds // Keep commented out for now
+      maxBounds: defaultBounds
     });
     
     this.map.on('load', () => {
