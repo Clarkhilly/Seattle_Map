@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 
-const center = [-122.2015, 47.6101]; // Centered between Seattle and Bellevue
+const audioFileSrc = "/playlists/InRainbows/Radiohead in Rainbows - From the Basement.mp3"; // Your MP3 file
 
+const center = [-122.2015, 47.6101]; // Centered between Seattle and Bellevue
 const defaultBounds = [
   [-122.6, 47.3],    // Southwest (includes Tacoma area)
   [-121.8, 47.9]     // Northeast (includes Redmond, Bothell)
 ];
-
 const seattleStations = {
   // 1 Line Stations (North to South) - Updated with precise coordinates from OSM data
   "lynnwood": { name: "Lynnwood City Center", coords: [ -122.2947,  47.8156], line: "1" },
@@ -49,69 +49,35 @@ const seattleStations = {
 
 mapboxgl.accessToken = process.env.MAPBOX_TOKEN;
 
-class Mapbox extends React.Component {
-  constructor(props) {
-    super(props);
-    
-    this.state = {
-      loading: true,
-      timestamp: null,
-      isDarkMode: true,
-    };
+function App() {
+  // --- Audio Player State and Refs ---
+  const audioRef = useRef(null); 
+  const [isPlaying, setIsPlaying] = useState(false);
 
-    this.mapLoaded = false;
-  }
-  
-  componentDidMount() {
-    // Load saved dark mode preference
-    const savedDarkMode = localStorage.getItem('seattleTransitDarkMode') !== 'false';
-    this.setState({ isDarkMode: savedDarkMode });
-
-    this.map = new mapboxgl.Map({
-      container: this.mapContainer,
-      style: savedDarkMode ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/light-v10',
-      center: center,
-      zoom: 11,
-      bearing: 0,
-      maxBounds: defaultBounds
-    });
-    
-    this.map.on('load', () => {
-      this.mapLoaded = true;
-      this.addOpenStreetMapRoute();
-      this.addStations();
-      this.setState({loading: false});
-    });
-  }
-
-  // Add toggle function
-  toggleDarkMode = () => {
-    const newDarkMode = !this.state.isDarkMode;
-    this.setState({ isDarkMode: newDarkMode });
-    
-    // Save preference
-    localStorage.setItem('seattleTransitDarkMode', newDarkMode.toString());
-    
-    // Change map style
-    const newStyle = newDarkMode ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/light-v10';
-    this.map.setStyle(newStyle);
-    
-    // Re-add layers after style change
-    this.map.once('styledata', () => {
-      if (this.mapLoaded) {
-        this.addOpenStreetMapRoute();
-        this.addStations();
-      }
-    });
+  const togglePlayPause = () => {
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) {
+      audioRef.current.play().catch(error => console.error("Error playing audio:", error));
+      setIsPlaying(true);
+    } else {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
   };
+  
+  // --- Mapbox State and Refs ---
+  const mapContainer = useRef(null);
+  const map = useRef(null);
+  const [mapLoading, setMapLoading] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const mapLoaded = useRef(false);
 
-  addStations() {
+  const addStations = () => {
     console.log('Adding station squares...');
-    
-    // Create GeoJSON features for stations
+    if (!map.current || !mapLoaded.current) return;
+
     const stationFeatures = Object.keys(seattleStations).map(stationId => {
       const station = seattleStations[stationId];
-      
       return {
         "type": "Feature",
         "properties": {
@@ -131,20 +97,23 @@ class Mapbox extends React.Component {
       "features": stationFeatures
     };
 
-    // Add station source
-    this.map.addSource("Stations", {
+    if (map.current.getSource("Stations")) {
+      if (map.current.getLayer("StationLabels")) map.current.removeLayer("StationLabels");
+      if (map.current.getLayer("StationSquares")) map.current.removeLayer("StationSquares");
+      map.current.removeSource("Stations");
+    }
+
+    map.current.addSource("Stations", {
       "type": "geojson",
       "data": stationGeoJson
     });
 
-    // Adjust colors based on dark mode
-    const stationColor = this.state.isDarkMode ? "#ffffff" : "#000000";
-    const stationStroke = this.state.isDarkMode ? "#000000" : "#ffffff";
-    const textColor = this.state.isDarkMode ? "#ffffff" : "#000000";
-    const textHalo = this.state.isDarkMode ? "#000000" : "#ffffff";
+    const stationColor = isDarkMode ? "#ffffff" : "#000000";
+    const stationStroke = isDarkMode ? "#000000" : "#ffffff";
+    const textColor = isDarkMode ? "#ffffff" : "#000000";
+    const textHalo = isDarkMode ? "#000000" : "#ffffff";
 
-    // Add station circles with theme-aware colors
-    this.map.addLayer({
+    map.current.addLayer({
       "id": "StationSquares",
       "type": "circle",
       "source": "Stations",
@@ -157,8 +126,7 @@ class Mapbox extends React.Component {
       }
     });
 
-    // Add station labels with theme-aware colors
-    this.map.addLayer({
+    map.current.addLayer({
       "id": "StationLabels",
       "type": "symbol",
       "source": "Stations",
@@ -177,8 +145,7 @@ class Mapbox extends React.Component {
       }
     });
 
-    // Add click interaction for stations
-    this.map.on('click', 'StationSquares', (e) => {
+    map.current.on('click', 'StationSquares', (e) => {
       const station = e.features[0];
       new mapboxgl.Popup()
         .setLngLat(e.lngLat)
@@ -191,130 +158,21 @@ class Mapbox extends React.Component {
               station.properties.line === '1' ? '1 Line' : '2 Line'}
           </div>
         `)
-        .addTo(this.map);
+        .addTo(map.current);
     });
 
-    // Change cursor on hover
-    this.map.on('mouseenter', 'StationSquares', () => {
-      this.map.getCanvas().style.cursor = 'pointer';
+    map.current.on('mouseenter', 'StationSquares', () => {
+      map.current.getCanvas().style.cursor = 'pointer';
     });
 
-    this.map.on('mouseleave', 'StationSquares', () => {
-      this.map.getCanvas().style.cursor = '';
+    map.current.on('mouseleave', 'StationSquares', () => {
+      map.current.getCanvas().style.cursor = '';
     });
 
     console.log('✅ Added station circles and labels');
-  }
+  };
 
-  async addOpenStreetMapRoute() {
-    console.log('Loading detailed routes from OpenStreetMap...');
-    
-    try {
-      // Enhanced query to get both 1 Line and 2 Line
-      const overpassQuery = `[out:json][timeout:30][bbox:47.4,-122.6,47.9,-121.8];
-       (
-         relation["route"="light_rail"]["name"~"Link|1 Line|2 Line"]["operator"~"Sound Transit"];
-         way(r);
-         relation["route"="light_rail"]["ref"~"1|2"]["network"="Sound Transit"];
-         way(r);
-         relation["route"="light_rail"]["name"~"East Link"];
-         way(r);
-       );
-       out geom;`;
-      
-      const response = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: overpassQuery
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('OSM Query Response:', data);
-      
-      if (data.elements && data.elements.length > 0) {
-        // Convert OSM data to GeoJSON and separate by line
-        const geoJsonFeatures = this.convertOSMToGeoJSON(data.elements);
-        
-        if (geoJsonFeatures.length > 0) {
-          // Separate features by line
-          const line1Features = geoJsonFeatures.filter(feature => 
-            feature.properties.name?.includes('1 Line') || 
-            feature.properties.ref === '1' ||
-            !feature.properties.name?.includes('2 Line')
-          );
-          
-          const line2Features = geoJsonFeatures.filter(feature => 
-            feature.properties.name?.includes('2 Line') || 
-            feature.properties.name?.includes('East Link') ||
-            feature.properties.ref === '2'
-          );
-
-          // Add 1 Line (Green)
-          if (line1Features.length > 0) {
-            this.map.addSource("OSMLine1Route", {
-              "type": "geojson",
-              "data": {
-                "type": "FeatureCollection",
-                "features": line1Features
-              }
-            });
-
-            this.map.addLayer({
-              "id": "OSMLine1Route",
-              "type": "line",
-              "source": "OSMLine1Route",
-              "paint": {
-                "line-color": "#00B04F",
-                "line-width": 5,
-                "line-opacity": 0.9
-              }
-            });
-            console.log('✅ Added 1 Line from OpenStreetMap');
-          }
-
-          // Add 2 Line (Blue)
-          if (line2Features.length > 0) {
-            this.map.addSource("OSMLine2Route", {
-              "type": "geojson",
-              "data": {
-                "type": "FeatureCollection",
-                "features": line2Features
-              }
-            });
-
-            this.map.addLayer({
-              "id": "OSMLine2Route",
-              "type": "line",
-              "source": "OSMLine2Route",
-              "paint": {
-                "line-color": "#0066CC",
-                "line-width": 5,
-                "line-opacity": 0.9
-              }
-            });
-            console.log('✅ Added 2 Line from OpenStreetMap');
-          }
-          
-          if (line1Features.length > 0 || line2Features.length > 0) {
-            console.log('✅ Loaded detailed routes from OpenStreetMap');
-            return; // Success - exit here
-          }
-        }
-      }
-      
-      console.log('❌ No route data found in OSM response');
-      
-    } catch (error) {
-      console.log('❌ OSM routes unavailable:', error.message);
-    }
-  }
-
-  convertOSMToGeoJSON(elements) {
-    // Filter for ways that have geometry and are likely transit routes
+  const convertOSMToGeoJSON = (elements) => {
     const ways = elements.filter(el => 
       el.type === 'way' && 
       el.geometry && 
@@ -325,9 +183,6 @@ class Mapbox extends React.Component {
        el.tags?.name?.toLowerCase().includes('light rail') ||
        el.tags?.name?.toLowerCase().includes('east link'))
     );
-    
-    console.log(`Converting ${ways.length} OSM ways to GeoJSON...`);
-    console.log('Sample way tags:', ways[0]?.tags);
     
     return ways.map(way => {
       const coordinates = way.geometry.map(node => [node.lon, node.lat]);
@@ -346,68 +201,285 @@ class Mapbox extends React.Component {
           "coordinates": coordinates
         }
       };
-    }).filter(feature => feature.geometry.coordinates.length > 1); // Only include valid lines
-  }
+    }).filter(feature => feature.geometry.coordinates.length > 1);
+  };
 
-  render() {
-    const { loading, isDarkMode } = this.state;
-    
-    // Toggle button styles
-    const toggleButtonStyle = {
-      position: 'absolute',
-      top: '10px',
-      right: '10px',
-      zIndex: 1000,
-      backgroundColor: isDarkMode ? '#333' : '#fff',
-      color: isDarkMode ? '#fff' : '#333',
-      border: `2px solid ${isDarkMode ? '#555' : '#ddd'}`,
-      borderRadius: '8px',
-      padding: '10px 15px',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: 'bold',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-      transition: 'all 0.3s ease'
-    };
+  const addOpenStreetMapRoute = async () => {
+    console.log('Loading detailed routes from OpenStreetMap...');
+    if (!map.current || !mapLoaded.current) return;
 
-    const loadingStyle = {
-      position: 'absolute',
-      top: '10px',
-      left: '10px',
-      background: isDarkMode ? '#333' : 'white',
-      color: isDarkMode ? '#fff' : '#333',
-      padding: '10px',
-      borderRadius: '5px',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-    };
+    try {
+      const overpassQuery = `[out:json][timeout:30][bbox:47.4,-122.6,47.9,-121.8];
+        (
+          relation["route"="light_rail"]["name"~"Link|1 Line|2 Line"]["operator"~"Sound Transit"];
+          way(r);
+          relation["route"="light_rail"]["ref"~"1|2"]["network"="Sound Transit"];
+          way(r);
+          relation["route"="light_rail"]["name"~"East Link"];
+          way(r);
+        );
+        out geom;`;
+      
+      const response = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: overpassQuery
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.elements && data.elements.length > 0) {
+        const geoJsonFeatures = convertOSMToGeoJSON(data.elements);
+        
+        if (geoJsonFeatures.length > 0) {
+          if (map.current.getSource("OSMLine1Route")) {
+            map.current.removeLayer("OSMLine1Route");
+            map.current.removeSource("OSMLine1Route");
+          }
+          if (map.current.getSource("OSMLine2Route")) {
+            map.current.removeLayer("OSMLine2Route");
+            map.current.removeSource("OSMLine2Route");
+          }
+
+          const line1Features = geoJsonFeatures.filter(feature => 
+            feature.properties.name?.includes('1 Line') || 
+            feature.properties.ref === '1' ||
+            (!feature.properties.name?.includes('2 Line') && !feature.properties.name?.includes('East Link'))
+          );
+          
+          const line2Features = geoJsonFeatures.filter(feature => 
+            feature.properties.name?.includes('2 Line') || 
+            feature.properties.name?.includes('East Link') ||
+            feature.properties.ref === '2'
+          );
+
+          if (line1Features.length > 0) {
+            map.current.addSource("OSMLine1Route", {
+              "type": "geojson",
+              "data": {
+                "type": "FeatureCollection",
+                "features": line1Features
+              }
+            });
+
+            map.current.addLayer({
+              "id": "OSMLine1Route",
+              "type": "line",
+              "source": "OSMLine1Route",
+              "paint": {
+                "line-color": "#00B04F",
+                "line-width": 5,
+                "line-opacity": 0.9
+              }
+            });
+            console.log('✅ Added 1 Line from OpenStreetMap');
+          }
+
+          if (line2Features.length > 0) {
+            map.current.addSource("OSMLine2Route", {
+              "type": "geojson",
+              "data": {
+                "type": "FeatureCollection",
+                "features": line2Features
+              }
+            });
+
+            map.current.addLayer({
+              "id": "OSMLine2Route",
+              "type": "line",
+              "source": "OSMLine2Route",
+              "paint": {
+                "line-color": "#0066CC",
+                "line-width": 5,
+                "line-opacity": 0.9
+              }
+            });
+            console.log('✅ Added 2 Line from OpenStreetMap');
+          }
+          
+          if (line1Features.length > 0 || line2Features.length > 0) {
+            return;
+          }
+        }
+      }
+      
+      console.log('❌ No route data found in OSM response');
+      
+    } catch (error) {
+      console.log('❌ OSM routes unavailable:', error.message);
+    }
+  };
+
+  const toggleDarkMode = () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    localStorage.setItem('seattleTransitDarkMode', newDarkMode.toString());
     
-    return (
-      <div style={{ backgroundColor: isDarkMode ? '#1a1a1a' : '#ffffff', height: '100vh' }}>
-        <div ref={el => this.mapContainer = el} className='mapbox' style={{width: '100%', height: '100vh'}}>
-        </div>
-        
-        {/* Dark Mode Toggle Button */}
-        <button 
-          onClick={this.toggleDarkMode}
-          style={toggleButtonStyle}
-          onMouseEnter={(e) => {
-            e.target.style.transform = 'scale(1.05)';
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = 'scale(1)';
-          }}
-        >
-          {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-        </button>
-        
-        {loading && (
-          <div style={loadingStyle}>
-            Loading Seattle transit data...
-          </div>
-        )}
+    if (map.current) {
+      const newStyle = newDarkMode ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/light-v10';
+      map.current.setStyle(newStyle);
+      
+      map.current.once('styledata', () => {
+        if (mapLoaded.current) {
+          addOpenStreetMapRoute();
+          addStations();
+        }
+      });
+    }
+  };
+
+  // --- Mapbox useEffect for initialization ---
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('seattleTransitDarkMode') !== 'false';
+    setIsDarkMode(savedDarkMode);
+
+    if (map.current) return; 
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: savedDarkMode ? 'mapbox://styles/mapbox/dark-v10' : 'mapbox://styles/mapbox/light-v10',
+      center: center,
+      zoom: 11,
+      bearing: 0,
+      maxBounds: defaultBounds
+    });
+    
+    map.current.on('load', () => {
+      mapLoaded.current = true;
+      addOpenStreetMapRoute();
+      addStations();
+      setMapLoading(false);
+    });
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, []);
+
+  // --- Styles ---
+  const toggleButtonStyle = {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    zIndex: 1000,
+    backgroundColor: isDarkMode ? '#333' : '#fff',
+    color: isDarkMode ? '#fff' : '#333',
+    border: `2px solid ${isDarkMode ? '#555' : '#ddd'}`,
+    borderRadius: '8px',
+    padding: '10px 15px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+    transition: 'all 0.3s ease'
+  };
+
+  const loadingStyle = {
+    position: 'absolute',
+    top: '10px',
+    left: '10px',
+    background: isDarkMode ? '#333' : 'white',
+    color: isDarkMode ? '#fff' : '#333',
+    padding: '10px',
+    borderRadius: '5px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+  };
+
+  // Audio player container with label and button
+  const musicPlayerContainerStyle = {
+    position: 'absolute',
+    bottom: '20px',
+    right: '20px',
+    zIndex: 1001,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '5px'
+  };
+
+  const musicLabelStyle = {
+    backgroundColor: isDarkMode ? 'rgba(50, 50, 50, 0.9)' : 'rgba(240, 240, 240, 0.9)',
+    color: isDarkMode ? '#eee' : '#333',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+  };
+
+  const audioPlayerStyle = {
+    backgroundColor: isDarkMode ? 'rgba(50, 50, 50, 0.9)' : 'rgba(240, 240, 240, 0.9)',
+    padding: '8px',
+    borderRadius: '50%',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '50px',
+    height: '50px',
+  };
+
+  const audioPlayerButtonStyle = {
+    background: 'none',
+    border: 'none',
+    color: isDarkMode ? '#eee' : '#333',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '0',
+    lineHeight: '1',
+  };
+
+  return (
+    <div style={{ backgroundColor: isDarkMode ? '#1a1a1a' : '#ffffff', height: '100vh', position: 'relative' }}>
+      
+      {/* Mapbox Section - Takes full height */}
+      <div ref={mapContainer} className='mapbox' style={{width: '100%', height: '100%'}}>
       </div>
-    );
-  }
+      
+      {/* Dark Mode Toggle Button */}
+      <button 
+        onClick={toggleDarkMode}
+        style={toggleButtonStyle}
+        onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+        onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+      >
+        {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+      </button>
+      
+      {mapLoading && (
+        <div style={loadingStyle}>
+          Loading Seattle transit data...
+        </div>
+      )}
+
+      {/* Music Player with Label */}
+      {audioFileSrc && (
+        <div style={musicPlayerContainerStyle}>
+          <div style={musicLabelStyle}>Music</div>
+          <div style={audioPlayerStyle}>
+            <audio 
+              ref={audioRef} 
+              src={audioFileSrc} 
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => setIsPlaying(false)}
+              style={{ display: 'none' }}
+            />
+            <button style={audioPlayerButtonStyle} onClick={togglePlayPause} title={isPlaying ? "Pause" : "Play"}>
+              {isPlaying ? '⏸️' : '▶️'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default Mapbox;
+export default App;
