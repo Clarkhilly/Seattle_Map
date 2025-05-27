@@ -56,7 +56,7 @@ class Mapbox extends React.Component {
     this.state = {
       loading: true,
       timestamp: null,
-      isDarkMode: false,
+      isDarkMode: true,
     };
 
     this.mapLoaded = false;
@@ -64,7 +64,7 @@ class Mapbox extends React.Component {
   
   componentDidMount() {
     // Load saved dark mode preference
-    const savedDarkMode = localStorage.getItem('seattleTransitDarkMode') === 'true';
+    const savedDarkMode = localStorage.getItem('seattleTransitDarkMode') !== 'false';
     this.setState({ isDarkMode: savedDarkMode });
 
     this.map = new mapboxgl.Map({
@@ -108,12 +108,6 @@ class Mapbox extends React.Component {
   addStations() {
     console.log('Adding station squares...');
     
-    // DEBUG: Check a few sample coordinates with new data
-    console.log('Sample stations:');
-    console.log('Westlake:', seattleStations['westlake']);
-    console.log('Northgate:', seattleStations['northgate']); 
-    console.log('Judkins Park:', seattleStations['judkins-park']);
-    
     // Create GeoJSON features for stations
     const stationFeatures = Object.keys(seattleStations).map(stationId => {
       const station = seattleStations[stationId];
@@ -136,9 +130,6 @@ class Mapbox extends React.Component {
       "type": "FeatureCollection",
       "features": stationFeatures
     };
-
-    // DEBUG: Log the GeoJSON
-    console.log('Station GeoJSON sample:', stationGeoJson.features.slice(0, 3));
 
     // Add station source
     this.map.addSource("Stations", {
@@ -212,31 +203,7 @@ class Mapbox extends React.Component {
       this.map.getCanvas().style.cursor = '';
     });
 
-    console.log('✅ Added station circles and labels with updated coordinates');
-  }
-
-  async fetchSoundTransitStations() {
-    try {
-      // Sound Transit GTFS feed
-      const gtfsUrl = 'https://www.soundtransit.org/GTFS/google_transit.zip';
-      
-      // Alternative: Use their real-time API
-      const apiUrl = 'https://api.soundtransit.org/v1/gtfs/stops';
-      
-      const response = await fetch(apiUrl);
-      const data = await response.json();
-      
-      // Filter for Link Light Rail stations
-      const linkStations = data.filter(stop => 
-        stop.route_type === 0 && // Light rail
-        stop.agency_id === 'ST'
-      );
-      
-      return linkStations;
-    } catch (error) {
-      console.log('Sound Transit API failed:', error);
-      return null;
-    }
+    console.log('✅ Added station circles and labels');
   }
 
   async addOpenStreetMapRoute() {
@@ -339,12 +306,10 @@ class Mapbox extends React.Component {
         }
       }
       
-      throw new Error('No route data found in OSM response');
+      console.log('❌ No route data found in OSM response');
       
     } catch (error) {
       console.log('❌ OSM routes unavailable:', error.message);
-      console.log('🔄 Falling back to static routes...');
-      this.addStaticRouteLines(); // Fallback to static method
     }
   }
 
@@ -382,69 +347,6 @@ class Mapbox extends React.Component {
         }
       };
     }).filter(feature => feature.geometry.coordinates.length > 1); // Only include valid lines
-  }
-
-  addStaticRouteLines() {
-    console.log('Adding backup static route lines...');
-    
-    // Enhanced static coordinates using the new precise station coordinates
-    const linkLightRailCoords = [
-      [-122.2858, 47.8188], // Lynnwood City Center
-      [-122.2782, 47.7836], // Mountlake Terrace
-      [-122.3175, 47.7770], // Shoreline North/185th
-      [-122.3276, 47.7479], // Shoreline South/148th
-      [-122.3374, 47.7522], // Northgate
-      [-122.3184, 47.6587], // Roosevelt
-      [-122.3138, 47.6601], // U District
-      [-122.3037, 47.6587], // University of Washington
-      [-122.3187, 47.6187], // Capitol Hill
-      [-122.3302, 47.6087], // Westlake
-      [-122.3326, 47.6062], // Symphony
-      [-122.3340, 47.6021], // Pioneer Square
-      [-122.3289, 47.5952], // International District/Chinatown
-      [-122.3138, 47.5911], // Stadium
-      [-122.3063, 47.5781], // SODO
-      [-122.3063, 47.5609], // Beacon Hill
-      [-122.2965, 47.5583], // Mount Baker
-      [-122.2878, 47.5401], // Columbia City
-      [-122.2801, 47.5255], // Othello
-      [-122.2687, 47.5097], // Rainier Beach
-      [-122.2573, 47.4799], // Tukwila International Blvd
-      [-122.3013, 47.4452], // SeaTac/Airport
-      [-122.2934, 47.4124]  // Angle Lake
-    ];
-
-    this.map.addSource("BackupLinkRoute", {
-      "type": "geojson",
-      "data": {
-        "type": "Feature",
-        "properties": {
-          "name": "Link Light Rail - 1 Line (Backup)",
-          "type": "backup"
-        },
-        "geometry": {
-          "type": "LineString",
-          "coordinates": linkLightRailCoords
-        }
-      }
-    });
-
-    this.map.addLayer({
-      "id": "BackupLinkRoute",
-      "type": "line",
-      "source": "BackupLinkRoute",
-      "layout": {
-        "line-join": "round",
-        "line-cap": "round"
-      },
-      "paint": {
-        "line-color": "#00B04F",
-        "line-width": 4,
-        "line-opacity": 0.8
-      }
-    });
-    
-    console.log('✅ Added backup static route with precise coordinates');
   }
 
   render() {
