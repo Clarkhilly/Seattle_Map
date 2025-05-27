@@ -26,7 +26,14 @@ const config = {
     filename: 'bundle.js',
     publicPath: '/'
   },
-  // Remove the resolve.fallback section - it's not needed for Webpack 4
+  resolve : {
+    extensions: ['.js', '.jsx', '.json'],
+    alias: {
+      'onebusaway-sdk': __dirname + '/node_modules/onebusaway-sdk/dist/onebusaway-sdk.js',
+      'react': __dirname + '/node_modules/react',
+      'react-dom': __dirname + '/node_modules/react-dom'
+    }
+  },
   module: {
     rules: [
       {
